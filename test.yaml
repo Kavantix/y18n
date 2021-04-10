@@ -1,4 +1,7 @@
 pages:
   home:
     title: Home
+    login popup:
+      title: Login
+      body: Please login
     closeButton: Close

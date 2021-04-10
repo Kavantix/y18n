@@ -142,29 +142,95 @@ Node nodeFromYaml(MapEntry<String, YamlNode> yaml) {
   );
 }
 
+Tree sortLeafChildrenFirst(Tree tree) {
+  return Tree(
+    tree //
+        .children
+        .map(_sortLeafChildrenFirst)
+        .toList(),
+  );
+}
+
+Node _sortLeafChildrenFirst(Node node) {
+  switch (node.type) {
+    case NodeTypes.subtree:
+      final subtree = node as SubTree;
+      subtree.children.sort(_compareNodes);
+      return subtree;
+    case NodeTypes.leaf:
+      return node;
+  }
+}
+
+int _compareNodes(Node lhs, Node rhs) {
+  if (lhs.type == rhs.type) return 0;
+  if (lhs.type == NodeTypes.leaf) return -1;
+  return 1;
+}
+
 StringBuffer writeYamlFileToBuffer(StringBuffer buffer, Tree tree) {
-  tree.children //
+  writeImportsToBuffer(buffer);
+  tree
+      .then(sortLeafChildrenFirst)
+      .children
       .forEach(_writeNodeToBuffer.apply(buffer));
   return buffer;
+}
+
+void writeImportsToBuffer(StringBuffer buffer) {
+  buffer.writeln("import 'package:intl/intl.dart';");
 }
 
 void _writeNodeToBuffer(StringBuffer buffer, Node node) {
   switch (node.type) {
     case NodeTypes.subtree:
-      buffer.writeln('${node.name.then(firstLetterUpperCased)}:');
-      (node as SubTree)
-          .children //
+      final subTree = node as SubTree;
+      final type = _typeNameForSubtree(subTree);
+      buffer.writeln();
+      buffer.writeln('class $type {');
+      buffer.writeln('  const $type();');
+      buffer.writeln();
+      subTree.children //
+          .where(nodeIsALeaf)
+          .map(nodeAsLeaf)
+          .forEach(_writeLeafGetterToBuffer.apply(buffer));
+      subTree.children //
+          .where(nodeIsASubtree)
+          .map(nodeAsSubtree)
+          .forEach(_writeSubtreeGetterToBuffer.apply(buffer));
+      buffer.writeln('}');
+      subTree.children //
+          .where(nodeIsASubtree)
           .forEach(_writeNodeToBuffer.apply(buffer));
       break;
     case NodeTypes.leaf:
-      final leaf = node as Leaf;
-      buffer.write(leaf.name);
-      buffer.write(' = ');
-      buffer.write(leaf.value);
-      buffer.writeln();
+      _writeLeafGetterToBuffer(buffer, node as Leaf);
       break;
   }
 }
+
+final _camelCaseRegex = RegExp(r' (.)');
+String camelCasedName(String name) =>
+    name.replaceAllMapped(_camelCaseRegex, (m) => m.group(1)!.toUpperCase());
+
+void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
+  buffer.writeln(
+      "  String get ${camelCasedName(leaf.name)} => Intl.message('${leaf.value}');");
+}
+
+void _writeSubtreeGetterToBuffer(StringBuffer buffer, SubTree subTree) {
+  final type = _typeNameForSubtree(subTree);
+  buffer
+      .writeln('  $type get ${camelCasedName(subTree.name)} => const $type();');
+}
+
+String _typeNameForSubtree(SubTree subTree) =>
+    '_${firstLetterUpperCased(camelCasedName(subTree.name))}';
+
+bool nodeIsALeaf(Node node) => node.type == NodeTypes.leaf;
+bool nodeIsASubtree(Node node) => node.type == NodeTypes.subtree;
+SubTree nodeAsSubtree(Node node) => node as SubTree;
+Leaf nodeAsLeaf(Node node) => node as Leaf;
 
 String firstLetterUpperCased(String input) =>
     input.substring(0, 1).toUpperCase() + input.substring(1);

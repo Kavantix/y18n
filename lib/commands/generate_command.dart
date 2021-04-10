@@ -31,6 +31,7 @@ class GenerateCommand extends Command {
         .map(retrieveInputFileContent)
         .then(parseYaml)
         .map(constructTreeFromYaml)
+        .map(sortLeafChildrenFirst)
         .reduce(
           writeYamlFileToBuffer,
           StringBuffer(),
