@@ -56,9 +56,13 @@ enum NodeTypes {
 }
 
 abstract class Node {
-  Node(this.name);
+  Node({
+    required this.name,
+    required this.parentNames,
+  });
 
   final String name;
+  final List<String> parentNames;
   NodeTypes get type;
 }
 
@@ -72,8 +76,9 @@ class Tree {
 class SubTree extends Node {
   SubTree({
     required String name,
+    required List<String> parentNames,
     required this.children,
-  }) : super(name);
+  }) : super(name: name, parentNames: parentNames);
 
   final List<Node> children;
 
@@ -85,8 +90,9 @@ class SubTree extends Node {
 class Leaf extends Node {
   Leaf({
     required String name,
+    required List<String> parentNames,
     required this.value,
-  }) : super(name);
+  }) : super(name: name, parentNames: parentNames);
 
   final String value;
 
@@ -104,17 +110,15 @@ Result<YamlDocument> parseYaml(String fileContent) {
   return yaml.asResult();
 }
 
-final _entryToYamlEntry = (MapEntry<dynamic, YamlNode> entry) {
-  print(entry.runtimeType);
-  return MapEntry(entry.key.value as String, entry.value);
-};
+final _entryToYamlEntry = (MapEntry<dynamic, YamlNode> entry) =>
+    MapEntry(entry.key.value as String, entry.value);
 
 Tree constructTreeFromYaml(YamlDocument yaml) {
   final content = yaml.contents;
   if (content is YamlMap) {
     final children = content.nodes.entries //
         .map(_entryToYamlEntry)
-        .map(nodeFromYaml)
+        .map(nodeFromYaml.apply([]))
         .toList();
     return Tree(children);
   }
@@ -122,22 +126,25 @@ Tree constructTreeFromYaml(YamlDocument yaml) {
   throw FallThroughError();
 }
 
-Node nodeFromYaml(MapEntry<String, YamlNode> yaml) {
+Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
   if (yaml.value is YamlScalar) {
     // TODO: handle non string values nicely
     return Leaf(
       name: yaml.key,
+      parentNames: parentNames,
       value: yaml.value.value as String,
     );
   }
   // TODO: handle nicely
   final content = yaml.value as YamlMap;
+  final name = yaml.key;
   final children = content.nodes.entries //
       .map(_entryToYamlEntry)
-      .map(nodeFromYaml)
+      .map(nodeFromYaml.apply(parentNames + [name]))
       .toList();
   return SubTree(
-    name: yaml.key,
+    name: name,
+    parentNames: parentNames,
     children: children,
   );
 }
@@ -214,6 +221,10 @@ String camelCasedName(String name) =>
     name.replaceAllMapped(_camelCaseRegex, (m) => m.group(1)!.toUpperCase());
 
 void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
+  buffer.writeln();
+  buffer.writeln('''
+  /// A translated string like:
+  /// `${leaf.value}`''');
   buffer.writeln(
       "  String get ${camelCasedName(leaf.name)} => Intl.message('${leaf.value}');");
 }
@@ -224,8 +235,15 @@ void _writeSubtreeGetterToBuffer(StringBuffer buffer, SubTree subTree) {
       .writeln('  $type get ${camelCasedName(subTree.name)} => const $type();');
 }
 
-String _typeNameForSubtree(SubTree subTree) =>
-    '_${firstLetterUpperCased(camelCasedName(subTree.name))}';
+String _typeNameForSubtree(SubTree subTree) {
+  final buffer = StringBuffer('_');
+  for (final name in subTree.parentNames.followedBy([subTree.name]))
+    name //
+        .then(camelCasedName)
+        .then(firstLetterUpperCased)
+        .then(buffer.write);
+  return buffer.toString();
+}
 
 bool nodeIsALeaf(Node node) => node.type == NodeTypes.leaf;
 bool nodeIsASubtree(Node node) => node.type == NodeTypes.subtree;
