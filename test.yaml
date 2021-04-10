@@ -3,5 +3,13 @@ pages:
     title: Home
     login popup:
       title: Login
-      body: Please login
+      body: >-
+        Please login
+
+        After logging in you'll be able to ...
     closeButton: Close
+  login:
+    title: Welcome
+
+test:
+  hello: World!

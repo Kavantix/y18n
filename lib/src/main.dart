@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:meta/meta.dart';
 import 'package:yaml/yaml.dart';
@@ -192,15 +193,15 @@ void _writeNodeToBuffer(StringBuffer buffer, Node node) {
   switch (node.type) {
     case NodeTypes.subtree:
       final subTree = node as SubTree;
-      final type = _typeNameForSubtree(subTree);
+      final type = _uniqueTypeNameforNode(subTree);
       buffer.writeln();
       buffer.writeln('class $type {');
       buffer.writeln('  const $type();');
-      buffer.writeln();
       subTree.children //
           .where(nodeIsALeaf)
           .map(nodeAsLeaf)
           .forEach(_writeLeafGetterToBuffer.apply(buffer));
+      buffer.writeln();
       subTree.children //
           .where(nodeIsASubtree)
           .map(nodeAsSubtree)
@@ -222,26 +223,44 @@ String camelCasedName(String name) =>
 
 void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
   buffer.writeln();
-  buffer.writeln('''
-  /// A translated string like:
-  /// `${leaf.value}`''');
-  buffer.writeln(
-      "  String get ${camelCasedName(leaf.name)} => Intl.message('${leaf.value}');");
+  buffer.writeln('  /// A translated string like:');
+  final lines = leaf.value.split('\n').toList();
+  for (final line in lines) {
+    buffer.writeln('  /// `$line`');
+  }
+  final name = camelCasedName(leaf.name);
+  buffer.writeln('  String get ${name} => Intl.message(');
+  if (lines.length > 1) {
+    buffer.writeln("        '''");
+    for (final line in lines.take(lines.length - 1)) {
+      buffer.writeln(line);
+    }
+    buffer.write(lines.last);
+    buffer.writeln("''',");
+  } else {
+    buffer.write("        '");
+    buffer.write(lines.first);
+    buffer.writeln("',");
+  }
+  final uniqueName = _uniqueTypeNameforNode(leaf);
+  buffer.writeln("        name: '$uniqueName',");
+  buffer.writeln('      );');
 }
 
 void _writeSubtreeGetterToBuffer(StringBuffer buffer, SubTree subTree) {
-  final type = _typeNameForSubtree(subTree);
+  final type = _uniqueTypeNameforNode(subTree);
   buffer
       .writeln('  $type get ${camelCasedName(subTree.name)} => const $type();');
 }
 
-String _typeNameForSubtree(SubTree subTree) {
+String _uniqueTypeNameforNode(Node node) {
   final buffer = StringBuffer('_');
-  for (final name in subTree.parentNames.followedBy([subTree.name]))
+  for (final name in node.parentNames.followedBy([node.name])) {
     name //
         .then(camelCasedName)
         .then(firstLetterUpperCased)
         .then(buffer.write);
+  }
   return buffer.toString();
 }
 
