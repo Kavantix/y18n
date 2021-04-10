@@ -50,9 +50,48 @@ Result<String> retrieveInputFileContent(String path) {
   }
 }
 
+enum NodeTypes {
+  subtree,
+  leaf,
+}
+
+abstract class Node {
+  Node(this.name);
+
+  final String name;
+  NodeTypes get type;
+}
+
 @immutable
-class YamlFile {
-  //
+class Tree {
+  Tree(this.children);
+  final List<Node> children;
+}
+
+@immutable
+class SubTree extends Node {
+  SubTree({
+    required String name,
+    required this.children,
+  }) : super(name);
+
+  final List<Node> children;
+
+  @override
+  NodeTypes get type => NodeTypes.subtree;
+}
+
+@immutable
+class Leaf extends Node {
+  Leaf({
+    required String name,
+    required this.value,
+  }) : super(name);
+
+  final String value;
+
+  @override
+  NodeTypes get type => NodeTypes.leaf;
 }
 
 Result<YamlDocument> parseYaml(String fileContent) {
@@ -65,10 +104,76 @@ Result<YamlDocument> parseYaml(String fileContent) {
   return yaml.asResult();
 }
 
-YamlFile constructTreeFromYaml(YamlDocument yaml) {
-  return YamlFile();
+final _entryToYamlEntry = (MapEntry<dynamic, YamlNode> entry) {
+  print(entry.runtimeType);
+  return MapEntry(entry.key.value as String, entry.value);
+};
+
+Tree constructTreeFromYaml(YamlDocument yaml) {
+  final content = yaml.contents;
+  if (content is YamlMap) {
+    final children = content.nodes.entries //
+        .map(_entryToYamlEntry)
+        .map(nodeFromYaml)
+        .toList();
+    return Tree(children);
+  }
+  // TODO: handle nicely
+  throw FallThroughError();
 }
 
-StringBuffer writeYamlFileToBuffer(StringBuffer buffer, YamlFile file) {
+Node nodeFromYaml(MapEntry<String, YamlNode> yaml) {
+  if (yaml.value is YamlScalar) {
+    // TODO: handle non string values nicely
+    return Leaf(
+      name: yaml.key,
+      value: yaml.value.value as String,
+    );
+  }
+  // TODO: handle nicely
+  final content = yaml.value as YamlMap;
+  final children = content.nodes.entries //
+      .map(_entryToYamlEntry)
+      .map(nodeFromYaml)
+      .toList();
+  return SubTree(
+    name: yaml.key,
+    children: children,
+  );
+}
+
+StringBuffer writeYamlFileToBuffer(StringBuffer buffer, Tree tree) {
+  tree.children //
+      .forEach(_writeNodeToBuffer.apply(buffer));
   return buffer;
+}
+
+void _writeNodeToBuffer(StringBuffer buffer, Node node) {
+  switch (node.type) {
+    case NodeTypes.subtree:
+      buffer.writeln('${node.name.then(firstLetterUpperCased)}:');
+      (node as SubTree)
+          .children //
+          .forEach(_writeNodeToBuffer.apply(buffer));
+      break;
+    case NodeTypes.leaf:
+      final leaf = node as Leaf;
+      buffer.write(leaf.name);
+      buffer.write(' = ');
+      buffer.write(leaf.value);
+      buffer.writeln();
+      break;
+  }
+}
+
+String firstLetterUpperCased(String input) =>
+    input.substring(0, 1).toUpperCase() + input.substring(1);
+
+// extension<T, I> on I Function(T) {
+extension<I extends Object> on I {
+  R then<R>(R Function(I) func) => func(this);
+}
+
+extension<T, P1, P2> on T Function(P1, P2) {
+  T Function(P2) apply(P1 p1) => (p2) => this(p1, p2);
 }

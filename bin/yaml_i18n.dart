@@ -12,5 +12,6 @@ void main(List<String> arguments) async {
     print(usage);
   } catch (error, trace) {
     Logger.root.severe('Something went wrong', error, trace);
+    rethrow;
   }
 }
