@@ -2,75 +2,7 @@ import 'dart:io';
 
 import 'package:meta/meta.dart';
 import 'package:yaml/yaml.dart';
-
-enum Errors {
-  fileNotFound,
-  yamlParsingFailed,
-}
-
-typedef ResultContinuation<T extends Object, V extends Object> = Result<T>
-    Function(V value);
-
-@immutable
-class Result<V extends Object> {
-  final V? value;
-  final Errors? error;
-  final Object? errorData;
-  bool get hasValue => value != null;
-  bool get hasError => error != null;
-
-  Result._casted(this.error, this.errorData) : value = null;
-
-  Result.value(V this.value)
-      : error = null,
-        errorData = null;
-  Result.fileNotFound(String this.errorData)
-      : error = Errors.fileNotFound,
-        value = null;
-  Result.yamlParsingFailed(Object this.errorData)
-      : error = Errors.yamlParsingFailed,
-        value = null;
-
-  String get fileNotFoundPath => errorData as String;
-  Object get yamlParsingFailedError => errorData as Object;
-
-  Result<T> cast<T extends Object>() {
-    assert(hasError, 'Cast is only allowed on results that have an error');
-    return Result<T>._casted(error, errorData);
-  }
-
-  Result<T> then<T extends Object>(ResultContinuation<T, V> continuation) =>
-      hasError ? cast<T>() : continuation(value!);
-}
-
-extension<T extends Object> on T {
-  Result<T> asResult() => Result<T>.value(this);
-}
-
-extension ResultListExtension<V extends Object> on Iterable<Result<V>> {
-  Result<List<R>> bind<R extends Object>(ResultContinuation<R, V> converter) {
-    final results = <R>[];
-    for (final result in this) {
-      if (result.hasError) return result.cast<List<R>>();
-      final convertedResult = converter(result.value!);
-      if (convertedResult.hasError) return convertedResult.cast<List<R>>();
-      results.add(convertedResult.value!);
-    }
-    return results.asResult();
-  }
-}
-
-// extension ListResultExtension<V extends Object> on Result<Iterable<V>> {
-//   Result<List<R>> bind<R extends Object>(ResultContinuation<R, V> mapper) {
-//     if (hasError) return cast<List<R>>();
-//     final results = <R>[];
-//     for (final result in value!.map(mapper)) {
-//       if (result.hasError) return result.cast<List<R>>();
-//       results.add(result.value!);
-//     }
-//     return results.asResult();
-//   }
-// }
+import 'result.dart';
 
 void outputBuffer(String outputOption, StringBuffer buffer) {
   switch (outputOption) {
@@ -123,15 +55,20 @@ class YamlFile {
   //
 }
 
-Result<YamlFile> parseFile(String fileContent) {
+Result<YamlDocument> parseYaml(String fileContent) {
   final YamlDocument yaml;
   try {
     yaml = loadYamlDocument(fileContent);
   } on Object catch (error) {
     return Result.yamlParsingFailed(error);
   }
+  return yaml.asResult();
+}
 
-  print(yaml.contents);
+YamlFile constructTreeFromYaml(YamlDocument yaml) {
+  return YamlFile();
+}
 
-  return YamlFile().asResult();
+StringBuffer writeYamlFileToBuffer(StringBuffer buffer, YamlFile file) {
+  return buffer;
 }

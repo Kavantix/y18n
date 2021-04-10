@@ -1,4 +1,6 @@
 import 'package:args/command_runner.dart';
+import '../src/result.dart';
+
 import '../src/main.dart';
 
 class GenerateCommand extends Command {
@@ -25,21 +27,25 @@ class GenerateCommand extends Command {
     if (paths.isEmpty) {
       usageException('No input files provided');
     }
-    final results = paths //
+    final result = paths //
         .map(retrieveInputFileContent)
-        .bind(parseFile);
-    if (results.hasError) {
-      switch (results.error!) {
+        .then(parseYaml)
+        .map(constructTreeFromYaml)
+        .reduce<StringBuffer>(
+          writeYamlFileToBuffer,
+          StringBuffer(),
+        );
+    if (result.hasError) {
+      switch (result.error!) {
         case Errors.fileNotFound:
-          usageException('File not found at path: ${results.fileNotFoundPath}');
+          usageException('File not found at path: ${result.fileNotFoundPath}');
         case Errors.yamlParsingFailed:
           print('Invalid yaml!');
-          print(results.yamlParsingFailedError);
+          print(result.yamlParsingFailedError);
           return 1;
       }
     }
-    final buffer = StringBuffer();
-    outputBuffer(args['output'], buffer);
+    outputBuffer(args['output'], result.value!);
     return 1;
   }
 }
