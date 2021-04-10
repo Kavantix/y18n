@@ -1,0 +1,2 @@
+#! /bin/sh
+dart run bin/yaml_i18n.dart "$@"
