@@ -32,10 +32,8 @@ class GenerateCommand extends Command {
         .then(parseYaml)
         .map(constructTreeFromYaml)
         .map(sortLeafChildrenFirst)
-        .reduce(
-          writeYamlFileToBuffer,
-          StringBuffer(),
-        );
+        .fold(mergeTrees)
+        .then(writeYamlFileToBuffer.apply(StringBuffer()));
     if (result.hasError) {
       switch (result.error!) {
         case Errors.fileNotFound:

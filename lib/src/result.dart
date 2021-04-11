@@ -38,8 +38,11 @@ class Result<V extends Object> {
     return Result<T>._casted(error, errorData);
   }
 
-  Result<T> then<T extends Object>(ResultContinuation<T, V> continuation) =>
+  Result<T> bind<T extends Object>(ResultContinuation<T, V> continuation) =>
       hasError ? cast<T>() : continuation(value!);
+
+  Result<T> then<T extends Object>(T Function(V value) converter) =>
+      hasError ? cast<T>() : converter(value!).asResult();
 }
 
 extension ObjectAsResultExtension<T extends Object> on T {
@@ -75,6 +78,11 @@ extension ListResultExtension<V extends Object> on Result<Iterable<V>> {
   Result<Iterable<R>> map<R extends Object>(R Function(V value) mapper) {
     if (hasError) return cast<List<R>>();
     return value!.map(mapper).asResult();
+  }
+
+  Result<R> fold<R extends Object>(R Function(Iterable<V> values) folder) {
+    if (hasError) return cast<R>();
+    return folder(value!).asResult();
   }
 
   Result<R> reduce<R extends Object>(

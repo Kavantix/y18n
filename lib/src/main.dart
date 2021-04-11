@@ -131,6 +131,9 @@ Tree constructTreeFromYaml(YamlDocument yaml) {
   throw FallThroughError();
 }
 
+Tree mergeTrees(Iterable<Tree> trees) =>
+    Tree([for (final tree in trees) ...tree.children]);
+
 final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
 Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
   if (yaml.value is YamlScalar) {
@@ -238,8 +241,7 @@ void _writeInheritedWidgetStaticMethodToBuffer(StringBuffer buffer) {
 
   static Strings of(BuildContext context) {
     return Localizations.of<Strings>(context, Strings)!;
-  }
-''');
+  }''');
 }
 
 final _camelCaseRegex = RegExp(r' (.)');
@@ -261,8 +263,8 @@ void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
     for (final argument in leaf.arguments) {
       buffer.writeln('    required String $argument,');
     }
-    buffer.writeln('  })');
-    buffer.writeln('    => Intl.message(');
+    buffer.writeln('  }) =>');
+    buffer.writeln('      Intl.message(');
   }
   if (lines.length > 1) {
     buffer.writeln("        '''");
@@ -283,7 +285,7 @@ void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
     for (final argument in leaf.arguments) {
       buffer.writeln('          $argument,');
     }
-    buffer.writeln('        ]');
+    buffer.writeln('        ],');
   }
   buffer.writeln('      );');
 }
@@ -318,6 +320,6 @@ extension<I extends Object> on I {
   R then<R>(R Function(I) func) => func(this);
 }
 
-extension<T, P1, P2> on T Function(P1, P2) {
+extension Function2ApplyExtension<T, P1, P2> on T Function(P1, P2) {
   T Function(P2) apply(P1 p1) => (p2) => this(p1, p2);
 }
