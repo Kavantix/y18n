@@ -198,6 +198,7 @@ StringBuffer writeYamlFileToBuffer(StringBuffer buffer, Tree tree) {
 }
 
 void writeImportsToBuffer(StringBuffer buffer) {
+  buffer.writeln("import 'package:flutter/widgets.dart';");
   buffer.writeln("import 'package:intl/intl.dart';");
 }
 
@@ -209,6 +210,9 @@ void _writeNodeToBuffer(StringBuffer buffer, Node node) {
       buffer.writeln();
       buffer.writeln('class $type {');
       buffer.writeln('  const $type();');
+      if (node.isRoot) {
+        _writeInheritedWidgetStaticMethodToBuffer(buffer);
+      }
       subTree.children //
           .where(nodeIsALeaf)
           .map(nodeAsLeaf)
@@ -227,6 +231,15 @@ void _writeNodeToBuffer(StringBuffer buffer, Node node) {
       _writeLeafGetterToBuffer(buffer, node as Leaf);
       break;
   }
+}
+
+void _writeInheritedWidgetStaticMethodToBuffer(StringBuffer buffer) {
+  buffer.writeln('''
+
+  static Strings of(BuildContext context) {
+    return Localizations.of<Strings>(context, Strings)!;
+  }
+''');
 }
 
 final _camelCaseRegex = RegExp(r' (.)');
