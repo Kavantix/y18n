@@ -4,7 +4,7 @@ pages:
     login popup:
       title: Login
       body: >-
-        Please login
+        Hello $name, please login
 
         After logging in you'll be able to ...
     closeButton: Close
@@ -13,3 +13,5 @@ pages:
 
 test:
   hello: World!
+
+hello world: test

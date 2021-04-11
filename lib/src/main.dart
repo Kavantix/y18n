@@ -65,6 +65,8 @@ abstract class Node {
   final String name;
   final List<String> parentNames;
   NodeTypes get type;
+
+  bool get isRoot => name == 'Strings';
 }
 
 @immutable
@@ -92,10 +94,12 @@ class Leaf extends Node {
   Leaf({
     required String name,
     required List<String> parentNames,
+    required this.arguments,
     required this.value,
   }) : super(name: name, parentNames: parentNames);
 
   final String value;
+  final List<String> arguments;
 
   @override
   NodeTypes get type => NodeTypes.leaf;
@@ -127,13 +131,20 @@ Tree constructTreeFromYaml(YamlDocument yaml) {
   throw FallThroughError();
 }
 
+final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
 Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
   if (yaml.value is YamlScalar) {
     // TODO: handle non string values nicely
+    final value = yaml.value.value as String;
+    final arguments = _argumentRegex
+        .allMatches(value)
+        .map((match) => match.group(1)!)
+        .toList();
     return Leaf(
       name: yaml.key,
       parentNames: parentNames,
-      value: yaml.value.value as String,
+      value: value,
+      arguments: arguments,
     );
   }
   // TODO: handle nicely
@@ -180,8 +191,9 @@ StringBuffer writeYamlFileToBuffer(StringBuffer buffer, Tree tree) {
   writeImportsToBuffer(buffer);
   tree
       .then(sortLeafChildrenFirst)
-      .children
-      .forEach(_writeNodeToBuffer.apply(buffer));
+      .then((tree) =>
+          SubTree(name: 'Strings', children: tree.children, parentNames: []))
+      .then(_writeNodeToBuffer.apply(buffer));
   return buffer;
 }
 
@@ -229,7 +241,16 @@ void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
     buffer.writeln('  /// `$line`');
   }
   final name = camelCasedName(leaf.name);
-  buffer.writeln('  String get ${name} => Intl.message(');
+  if (leaf.arguments.isEmpty) {
+    buffer.writeln('  String get ${name} => Intl.message(');
+  } else {
+    buffer.writeln('  String ${name}({');
+    for (final argument in leaf.arguments) {
+      buffer.writeln('    required String $argument,');
+    }
+    buffer.writeln('  })');
+    buffer.writeln('    => Intl.message(');
+  }
   if (lines.length > 1) {
     buffer.writeln("        '''");
     for (final line in lines.take(lines.length - 1)) {
@@ -244,6 +265,13 @@ void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
   }
   final uniqueName = _uniqueTypeNameforNode(leaf);
   buffer.writeln("        name: '$uniqueName',");
+  if (leaf.arguments.isNotEmpty) {
+    buffer.writeln('        args: [');
+    for (final argument in leaf.arguments) {
+      buffer.writeln('          $argument,');
+    }
+    buffer.writeln('        ]');
+  }
   buffer.writeln('      );');
 }
 
@@ -254,7 +282,7 @@ void _writeSubtreeGetterToBuffer(StringBuffer buffer, SubTree subTree) {
 }
 
 String _uniqueTypeNameforNode(Node node) {
-  final buffer = StringBuffer('_');
+  final buffer = StringBuffer(node.isRoot ? '' : '_');
   for (final name in node.parentNames.followedBy([node.name])) {
     name //
         .then(camelCasedName)
