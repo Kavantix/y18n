@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 
 import 'package:meta/meta.dart';
 import 'package:yaml/yaml.dart';
@@ -42,12 +41,23 @@ void outputBufferToStdOut(StringBuffer buffer) {
 //   return contents.asResult();
 // }
 
-Result<String> retrieveInputFileContent(String path) {
+@immutable
+class FileContent {
+  FileContent({
+    required this.path,
+    required this.content,
+  });
+  final String path;
+  final String content;
+}
+
+Result<FileContent> retrieveInputFileContent(String path) {
   final file = File(path);
   if (!file.existsSync()) {
     return Result.fileNotFound(path);
   } else {
-    return file.readAsStringSync().asResult();
+    final content = file.readAsStringSync();
+    return FileContent(path: path, content: content).asResult();
   }
 }
 
@@ -56,6 +66,7 @@ enum NodeTypes {
   leaf,
 }
 
+@immutable
 abstract class Node {
   Node({
     required this.name,
@@ -105,12 +116,15 @@ class Leaf extends Node {
   NodeTypes get type => NodeTypes.leaf;
 }
 
-Result<YamlDocument> parseYaml(String fileContent) {
+Result<YamlDocument> parseYaml(FileContent fileContent) {
   final YamlDocument yaml;
   try {
-    yaml = loadYamlDocument(fileContent);
+    yaml = loadYamlDocument(fileContent.content);
   } on Object catch (error) {
-    return Result.yamlParsingFailed(error);
+    return Result.yamlParsingFailed(FileError(
+      path: fileContent.path,
+      error: error,
+    ));
   }
   return yaml.asResult();
 }
@@ -257,9 +271,9 @@ void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
   }
   final name = camelCasedName(leaf.name);
   if (leaf.arguments.isEmpty) {
-    buffer.writeln('  String get ${name} => Intl.message(');
+    buffer.writeln('  String get $name => Intl.message(');
   } else {
-    buffer.writeln('  String ${name}({');
+    buffer.writeln('  String $name({');
     for (final argument in leaf.arguments) {
       buffer.writeln('    required String $argument,');
     }

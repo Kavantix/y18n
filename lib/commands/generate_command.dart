@@ -30,21 +30,22 @@ class GenerateCommand extends Command {
     final result = paths //
         .map(retrieveInputFileContent)
         .then(parseYaml)
-        .map(constructTreeFromYaml)
-        .map(sortLeafChildrenFirst)
+        .mapAll(constructTreeFromYaml)
+        .mapAll(sortLeafChildrenFirst)
         .fold(mergeTrees)
-        .then(writeYamlFileToBuffer.apply(StringBuffer()));
+        .map(writeYamlFileToBuffer.apply(StringBuffer()));
     if (result.hasError) {
       switch (result.error!) {
         case Errors.fileNotFound:
           usageException('File not found at path: ${result.fileNotFoundPath}');
         case Errors.yamlParsingFailed:
-          print('Invalid yaml!');
-          print(result.yamlParsingFailedError);
+          final fileError = result.yamlParsingFailedError;
+          print('${fileError.path} contains invalid yaml:');
+          print(fileError.error);
           return 1;
       }
     }
     outputBuffer(args['output'], result.value!);
-    return 1;
+    return 0;
   }
 }

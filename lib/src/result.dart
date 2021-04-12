@@ -5,6 +5,16 @@ enum Errors {
   yamlParsingFailed,
 }
 
+@immutable
+class FileError {
+  FileError({
+    required this.path,
+    required this.error,
+  });
+  final String path;
+  final Object error;
+}
+
 typedef ResultContinuation<T extends Object, V extends Object> = Result<T>
     Function(V value);
 typedef ResultReducer<R extends Object, V extends Object> = R Function(
@@ -26,23 +36,23 @@ class Result<V extends Object> {
   Result.fileNotFound(String this.errorData)
       : error = Errors.fileNotFound,
         value = null;
-  Result.yamlParsingFailed(Object this.errorData)
+  Result.yamlParsingFailed(FileError this.errorData)
       : error = Errors.yamlParsingFailed,
         value = null;
 
   String get fileNotFoundPath => errorData as String;
-  Object get yamlParsingFailedError => errorData as Object;
+  FileError get yamlParsingFailedError => errorData as FileError;
 
-  Result<T> cast<T extends Object>() {
+  Result<T> _cast<T extends Object>() {
     assert(hasError, 'Cast is only allowed on results that have an error');
     return Result<T>._casted(error, errorData);
   }
 
   Result<T> bind<T extends Object>(ResultContinuation<T, V> continuation) =>
-      hasError ? cast<T>() : continuation(value!);
+      hasError ? _cast<T>() : continuation(value!);
 
-  Result<T> then<T extends Object>(T Function(V value) converter) =>
-      hasError ? cast<T>() : converter(value!).asResult();
+  Result<T> map<T extends Object>(T Function(V value) converter) =>
+      hasError ? _cast<T>() : converter(value!).asResult();
 }
 
 extension ObjectAsResultExtension<T extends Object> on T {
@@ -53,9 +63,9 @@ extension ResultListExtension<V extends Object> on Iterable<Result<V>> {
   Result<List<R>> then<R extends Object>(ResultContinuation<R, V> converter) {
     final results = <R>[];
     for (final result in this) {
-      if (result.hasError) return result.cast<List<R>>();
+      if (result.hasError) return result._cast<List<R>>();
       final convertedResult = converter(result.value!);
-      if (convertedResult.hasError) return convertedResult.cast<List<R>>();
+      if (convertedResult.hasError) return convertedResult._cast<List<R>>();
       results.add(convertedResult.value!);
     }
     return results.asResult();
@@ -67,7 +77,7 @@ extension ResultListExtension<V extends Object> on Iterable<Result<V>> {
   ) {
     var output = initialValue;
     for (final result in this) {
-      if (result.hasError) return result.cast<R>();
+      if (result.hasError) return result._cast<R>();
       output = reducer(output, result.value!);
     }
     return output.asResult();
@@ -75,13 +85,13 @@ extension ResultListExtension<V extends Object> on Iterable<Result<V>> {
 }
 
 extension ListResultExtension<V extends Object> on Result<Iterable<V>> {
-  Result<Iterable<R>> map<R extends Object>(R Function(V value) mapper) {
-    if (hasError) return cast<List<R>>();
+  Result<Iterable<R>> mapAll<R extends Object>(R Function(V value) mapper) {
+    if (hasError) return _cast<List<R>>();
     return value!.map(mapper).asResult();
   }
 
   Result<R> fold<R extends Object>(R Function(Iterable<V> values) folder) {
-    if (hasError) return cast<R>();
+    if (hasError) return _cast<R>();
     return folder(value!).asResult();
   }
 
@@ -89,7 +99,7 @@ extension ListResultExtension<V extends Object> on Result<Iterable<V>> {
     ResultReducer<R, V> reducer,
     R initialValue,
   ) {
-    if (hasError) return cast<R>();
+    if (hasError) return _cast<R>();
     var output = initialValue;
     for (final result in value!) {
       output = reducer(output, result);
