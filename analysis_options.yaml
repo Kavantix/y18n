@@ -12,8 +12,8 @@ linter:
 #     - camel_case_types
 
 analyzer:
-  #   exclude:
-  #     - path/to/excluded/files/**
+  exclude:
+    - build/**
 
   errors:
     exhaustive_cases: error

@@ -1,7 +1,10 @@
 import 'package:args/command_runner.dart';
-import '../src/result.dart';
 
 import '../src/main.dart';
+import '../src/parse_yaml.dart';
+import '../src/result.dart';
+import '../src/tree.dart';
+import '../src/write_tree.dart';
 
 class GenerateCommand extends Command {
   @override
@@ -31,7 +34,6 @@ class GenerateCommand extends Command {
         .map(retrieveInputFileContent)
         .bindAll(parseYaml)
         .mapAll(constructTreeFromYaml)
-        .mapAll(sortLeafChildrenFirst)
         .map(mergeTrees)
         .map(writeTreeToBuffer);
     if (result.hasError) {
