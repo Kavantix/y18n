@@ -186,13 +186,13 @@ void _writeArgumentsToBuffer(
     buffer.writeln('    required String $argument,');
   }
   buffer.writeln('  }) =>');
-  buffer.writeln('      _$name(');
+  buffer.writeln('      _\$$name(');
   for (final argument in leaf.arguments) {
     buffer.writeln('        $argument,');
   }
   buffer.writeln('      );');
   buffer.writeln();
-  buffer.writeln('  String _$name(');
+  buffer.writeln('  String _\$$name(');
   buffer.writeln('    $firstArgumentType ${leaf.arguments.first},');
   for (final argument in leaf.arguments.skip(1)) {
     buffer.writeln('    String $argument,');
@@ -238,8 +238,12 @@ String _uniqueLeafNameforNode(Node node, {required bool isPrivate}) {
         .map(firstLetterUpperCased)
         .map(buffer.write);
   }
-  if (isPrivate) buffer.write('_');
-  buffer.write('_${camelCasedName(node.name)}');
+  if (isPrivate) {
+    buffer.write(r'__\$');
+  } else {
+    buffer.write('_');
+  }
+  buffer.write(camelCasedName(node.name));
   return buffer.toString();
 }
 
