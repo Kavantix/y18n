@@ -5,14 +5,14 @@ StringBuffer writeTreeToBuffer(Tree tree) {
   final buffer = StringBuffer();
   writeImportsToBuffer(buffer);
   tree
-      .then(sortLeafChildrenFirst)
-      .then((tree) => SubTree(
+      .map(sortLeafChildrenFirst)
+      .map((tree) => SubTree(
             name: 'Strings',
             children: _childrenWithParentNameForLeafChildren(tree.children,
                 parentName: 'Strings'),
             parentNames: [],
           ))
-      .then(_writeNodeToBuffer.apply(buffer));
+      .map(_writeNodeToBuffer.apply(buffer));
   return buffer;
 }
 
@@ -234,9 +234,9 @@ String _uniqueLeafNameforNode(Node node, {required bool isPrivate}) {
   final buffer = StringBuffer(node.isRoot ? '' : '_');
   for (final name in node.parentNames) {
     name //
-        .then(camelCasedName)
-        .then(firstLetterUpperCased)
-        .then(buffer.write);
+        .map(camelCasedName)
+        .map(firstLetterUpperCased)
+        .map(buffer.write);
   }
   if (isPrivate) buffer.write('_');
   buffer.write('_${camelCasedName(node.name)}');
@@ -247,9 +247,9 @@ String _uniqueTypeNameforNode(Node node) {
   final buffer = StringBuffer(node.isRoot ? '' : '_');
   for (final name in node.parentNames.followedBy([node.name])) {
     name //
-        .then(camelCasedName)
-        .then(firstLetterUpperCased)
-        .then(buffer.write);
+        .map(camelCasedName)
+        .map(firstLetterUpperCased)
+        .map(buffer.write);
   }
   return buffer.toString();
 }

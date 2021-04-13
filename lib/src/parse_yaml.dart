@@ -40,28 +40,42 @@ Result<YamlDocument> parseYaml(FileContent fileContent) {
   return yaml.asResult();
 }
 
-final _entryToYamlEntry = (MapEntry<dynamic, YamlNode> entry) =>
-    MapEntry(entry.key.value as String, entry.value);
+class _YamlStructureInvalid implements Exception {
+  _YamlStructureInvalid(this.parentNames, this.message);
 
-Tree constructTreeFromYaml(YamlDocument yaml) {
+  final List<String> parentNames;
+  final String message;
+}
+
+Result<Tree> constructTreeFromYaml(YamlDocument yaml) {
   final content = yaml.contents;
-  if (content is YamlMap) {
+  if (content is! YamlMap) {
+    return Result.yamlStructureInvalid('Invalid yaml file');
+  }
+  try {
     final children = content.nodes.entries //
         .map(_entryToYamlEntry)
         .map(nodeFromYaml.apply([]))
         .toList();
-    return Tree(children);
+    return Tree(children).asResult();
+  } on _YamlStructureInvalid catch (error) {
+    return Result.yamlStructureInvalid(
+      '''
+Yaml structure invalid!
+> Error at: ${error.parentNames.join(" -> ")}
+> ** ${error.message} **''',
+    );
   }
-  // TODO: handle nicely
-  throw FallThroughError();
 }
+
+final _entryToYamlEntry = (MapEntry<dynamic, YamlNode> entry) =>
+    MapEntry(entry.key.value as String, entry.value);
 
 Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
   final yamlValue = yaml.value;
   final name = yaml.key;
   if (yamlValue is YamlScalar) {
-    // TODO: handle non string values nicely
-    final value = yamlValue.value as String;
+    final value = yamlValue.value.toString();
     final arguments = _argumentsFromValue(value);
     return ValueLeaf(
       name: name,
@@ -69,24 +83,29 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
       value: value,
       arguments: arguments,
     );
-  } else if (yamlValue is YamlMap &&
-      (yamlValue.keys.first as String).startsWith('\$')) {
-    if (yamlValue.keys.contains('\$plural')) {
-      final other = yamlValue['\$plural'] as String;
-      return PluralLeaf(
-        name: name,
-        parentNames: parentNames,
-        other: other,
-        zero: yamlValue['\$zero'] as String?,
-        one: yamlValue['\$one'] as String?,
-        two: yamlValue['\$two'] as String?,
-        few: yamlValue['\$few'] as String?,
-        many: yamlValue['\$many'] as String?,
-        arguments: _argumentsFromValue(other),
-      );
-    }
   }
-  // TODO: handle nicely
+  if (yamlValue is! YamlMap) {
+    throw _YamlStructureInvalid(
+      parentNames + [name],
+      yamlValue is YamlList
+          ? 'Lists are not allowed'
+          : 'Only scalars and maps are allowed',
+    );
+  }
+  if (yamlValue is YamlMap && yamlValue.keys.contains('\$plural')) {
+    final other = yamlValue['\$plural'].toString();
+    return PluralLeaf(
+      name: name,
+      parentNames: parentNames,
+      other: other,
+      zero: yamlValue['\$zero']?.toString(),
+      one: yamlValue['\$one']?.toString(),
+      two: yamlValue['\$two']?.toString(),
+      few: yamlValue['\$few']?.toString(),
+      many: yamlValue['\$many']?.toString(),
+      arguments: _argumentsFromValue(other),
+    );
+  }
   final content = yaml.value as YamlMap;
   final children = content.nodes.entries //
       .map(_entryToYamlEntry)
@@ -100,8 +119,8 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
 }
 
 final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
-List<String> _argumentsFromValue(String value) => _argumentRegex
-    .allMatches(value)
-    .map((match) => match.group(1)!)
-    .toSet()
-    .toList();
+Set<String> _argumentsFromValue(String value) => //
+    _argumentRegex //
+        .allMatches(value)
+        .map((match) => match.group(1)!)
+        .toSet();

@@ -30,7 +30,7 @@ abstract class Leaf extends Node {
     required this.arguments,
   }) : super(name: name, parentNames: parentNames);
 
-  final List<String> arguments;
+  final Set<String> arguments;
 }
 
 @immutable
@@ -58,7 +58,7 @@ class ValueLeaf extends Leaf {
   ValueLeaf({
     required String name,
     required List<String> parentNames,
-    required List<String> arguments,
+    required Set<String> arguments,
     required this.value,
   }) : super(name: name, parentNames: parentNames, arguments: arguments);
 
@@ -73,7 +73,7 @@ class PluralLeaf extends Leaf {
   PluralLeaf({
     required String name,
     required List<String> parentNames,
-    required List<String> arguments,
+    required Set<String> arguments,
     required this.other,
     required this.zero,
     required this.one,

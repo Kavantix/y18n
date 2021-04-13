@@ -16,7 +16,9 @@ void main(List<String> arguments) async {
     exit(1);
   } catch (error, trace) {
     Logger.root.severe('Something went wrong', error, trace);
-    exit(2);
+    print(error);
+    print(trace);
+    exit(1);
   }
   if (returnCode is int) {
     exit(returnCode);

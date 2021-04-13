@@ -33,7 +33,7 @@ class GenerateCommand extends Command {
     final result = paths //
         .map(retrieveInputFileContent)
         .bindAll(parseYaml)
-        .mapAll(constructTreeFromYaml)
+        .bindAll(constructTreeFromYaml)
         .map(mergeTrees)
         .map(writeTreeToBuffer);
     if (result.hasError) {
@@ -44,6 +44,10 @@ class GenerateCommand extends Command {
           final fileError = result.yamlParsingFailedError;
           print('${fileError.path} contains invalid yaml:');
           print(fileError.error);
+          return 1;
+        case Errors.yamlStructureInvalid:
+          final message = result.yamlStructureInvalidMessage;
+          print(message);
           return 1;
       }
     }

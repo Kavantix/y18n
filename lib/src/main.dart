@@ -17,7 +17,6 @@ void outputBufferToFile(File file, StringBuffer buffer) {
 File fileForOutputOption(String outputOption) {
   final file = File(outputOption);
   file.createSync(recursive: true);
-  // TODO: do some more checks.
   return file;
 }
 

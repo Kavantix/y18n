@@ -3,6 +3,7 @@ import 'package:meta/meta.dart';
 enum Errors {
   fileNotFound,
   yamlParsingFailed,
+  yamlStructureInvalid,
 }
 
 @immutable
@@ -39,9 +40,13 @@ class Result<V extends Object> {
   Result.yamlParsingFailed(FileError this.errorData)
       : error = Errors.yamlParsingFailed,
         value = null;
+  Result.yamlStructureInvalid(String this.errorData)
+      : error = Errors.yamlStructureInvalid,
+        value = null;
 
   String get fileNotFoundPath => errorData as String;
   FileError get yamlParsingFailedError => errorData as FileError;
+  String get yamlStructureInvalidMessage => errorData as String;
 
   Result<T> _cast<T extends Object>() {
     assert(hasError, 'Cast is only allowed on results that have an error');
@@ -86,6 +91,18 @@ extension ResultListExtension<V extends Object> on Iterable<Result<V>> {
 }
 
 extension ListResultExtension<V extends Object> on Result<Iterable<V>> {
+  Result<List<R>> bindAll<R extends Object>(
+      ResultContinuation<R, V> converter) {
+    if (hasError) return _cast<List<R>>();
+    final results = <R>[];
+    for (final result in value!) {
+      final convertedResult = converter(result);
+      if (convertedResult.hasError) return convertedResult._cast<List<R>>();
+      results.add(convertedResult.value!);
+    }
+    return results.asResult();
+  }
+
   Result<Iterable<R>> mapAll<R extends Object>(R Function(V value) mapper) {
     if (hasError) return _cast<List<R>>();
     return value!.map(mapper).asResult();
