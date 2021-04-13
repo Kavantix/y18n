@@ -35,6 +35,7 @@ class GenerateCommand extends Command {
         .bindAll(parseYaml)
         .bindAll(constructTreeFromYaml)
         .map(mergeTrees)
+        .map(fixNames)
         .map(writeTreeToBuffer);
     if (result.hasError) {
       switch (result.error!) {

@@ -8,3 +8,7 @@ extension Function2ApplyExtension<T, P1, P2> on T Function(P1, P2) {
 
 String firstLetterUpperCased(String input) =>
     input.substring(0, 1).toUpperCase() + input.substring(1);
+
+final _camelCaseRegex = RegExp(r' (.)');
+String camelCasedName(String name) =>
+    name.replaceAllMapped(_camelCaseRegex, (m) => m.group(1)!.toUpperCase());

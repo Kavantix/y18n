@@ -107,7 +107,11 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
     );
   }
   final content = yaml.value as YamlMap;
+  final publicName = content.keys.contains('\$name') //
+      ? content['\$name'].toString()
+      : null;
   final children = content.nodes.entries //
+      .where((e) => e.key.value != '\$name')
       .map(_entryToYamlEntry)
       .map(nodeFromYaml.apply(parentNames + [name]))
       .toList();
@@ -115,6 +119,7 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
     name: name,
     parentNames: parentNames,
     children: children,
+    publicName: publicName,
   );
 }
 

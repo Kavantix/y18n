@@ -11,6 +11,7 @@ StringBuffer writeTreeToBuffer(Tree tree) {
             children: _childrenWithParentNameForLeafChildren(tree.children,
                 parentName: 'Strings'),
             parentNames: [],
+            publicName: 'Strings',
           ))
       .map(_writeNodeToBuffer.apply(buffer));
   return buffer;
@@ -57,12 +58,14 @@ void _writeNodeToBuffer(StringBuffer buffer, Node node) {
   switch (node.type) {
     case NodeTypes.subtree:
       final subTree = node as SubTree;
-      final type = _uniqueTypeNameforNode(subTree);
+      final type = _uniqueSubTreeName(subTree);
       buffer.writeln();
       buffer.writeln('class $type {');
-      buffer.writeln('  const $type();');
-      if (node.isRoot) {
+      if (node.name == 'Strings') {
+        buffer.writeln('  const Strings();');
         _writeInheritedWidgetStaticMethodToBuffer(buffer);
+      } else {
+        buffer.writeln('  const $type._();');
       }
       subTree.children //
           .where(nodeIsALeaf)
@@ -107,10 +110,6 @@ void _writeInheritedWidgetStaticMethodToBuffer(StringBuffer buffer) {
   }''');
 }
 
-final _camelCaseRegex = RegExp(r' (.)');
-String camelCasedName(String name) =>
-    name.replaceAllMapped(_camelCaseRegex, (m) => m.group(1)!.toUpperCase());
-
 void _writeValueLeafToBuffer(StringBuffer buffer, ValueLeaf leaf) {
   buffer.writeln();
   buffer.writeln('  /// A translated string like:');
@@ -118,7 +117,7 @@ void _writeValueLeafToBuffer(StringBuffer buffer, ValueLeaf leaf) {
   for (final line in lines) {
     buffer.writeln('  /// `$line`');
   }
-  final name = camelCasedName(leaf.name);
+  final name = leaf.name;
   if (leaf.arguments.isEmpty) {
     buffer.writeln('  String get $name => Intl.message(');
   } else {
@@ -127,7 +126,7 @@ void _writeValueLeafToBuffer(StringBuffer buffer, ValueLeaf leaf) {
   }
   _writeLeafLinesToBuffer(buffer, lines);
   final uniqueName =
-      _uniqueLeafNameforNode(leaf, isPrivate: leaf.arguments.isNotEmpty);
+      _uniqueLeafName(leaf, isPrivate: leaf.arguments.isNotEmpty);
   buffer.writeln("        name: '$uniqueName',");
   if (leaf.arguments.isNotEmpty) {
     buffer.writeln('        args: [');
@@ -162,7 +161,7 @@ void _writePluralLeafToBuffer(StringBuffer buffer, PluralLeaf leaf) {
     final lines = param.value!.split('\n').toList();
     _writeLeafLinesToBuffer(buffer, lines, key: param.key);
   }
-  final uniqueName = _uniqueLeafNameforNode(leaf, isPrivate: true);
+  final uniqueName = _uniqueLeafName(leaf, isPrivate: true);
   buffer.writeln("        name: '$uniqueName',");
   if (leaf.arguments.isNotEmpty) {
     buffer.writeln('        args: [');
@@ -179,7 +178,7 @@ void _writeArgumentsToBuffer(
   Leaf leaf, {
   String firstArgumentType = 'String',
 }) {
-  final name = camelCasedName(leaf.name);
+  final name = leaf.name;
   buffer.writeln('  String $name({');
   buffer.writeln('    required $firstArgumentType ${leaf.arguments.first},');
   for (final argument in leaf.arguments.skip(1)) {
@@ -225,35 +224,22 @@ void _writeLeafLinesToBuffer(StringBuffer buffer, List<String> lines,
 }
 
 void _writeSubtreeGetterToBuffer(StringBuffer buffer, SubTree subTree) {
-  final type = _uniqueTypeNameforNode(subTree);
-  buffer
-      .writeln('  $type get ${camelCasedName(subTree.name)} => const $type();');
+  final type = _uniqueSubTreeName(subTree);
+  buffer.writeln('  $type get ${subTree.name} => const $type._();');
 }
 
-String _uniqueLeafNameforNode(Node node, {required bool isPrivate}) {
-  final buffer = StringBuffer(node.isRoot ? '' : '_');
-  for (final name in node.parentNames) {
-    name //
-        .map(camelCasedName)
-        .map(firstLetterUpperCased)
-        .map(buffer.write);
-  }
+String _uniqueLeafName(Leaf leaf, {required bool isPrivate}) {
+  final buffer = StringBuffer();
+  leaf.parentNames.forEach(buffer.write);
   if (isPrivate) {
     buffer.write(r'__\$');
   } else {
     buffer.write('_');
   }
-  buffer.write(camelCasedName(node.name));
+  buffer.write(leaf.name);
   return buffer.toString();
 }
 
-String _uniqueTypeNameforNode(Node node) {
-  final buffer = StringBuffer(node.isRoot ? '' : '_');
-  for (final name in node.parentNames.followedBy([node.name])) {
-    name //
-        .map(camelCasedName)
-        .map(firstLetterUpperCased)
-        .map(buffer.write);
-  }
-  return buffer.toString();
+String _uniqueSubTreeName(SubTree subTree) {
+  return subTree.publicName ?? subTree.name;
 }

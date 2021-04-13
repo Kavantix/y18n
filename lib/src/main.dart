@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'common.dart';
+import 'tree.dart';
+
 void outputBuffer(String outputOption, StringBuffer buffer) {
   switch (outputOption) {
     case 'stdout':
@@ -22,4 +25,67 @@ File fileForOutputOption(String outputOption) {
 
 void outputBufferToStdOut(StringBuffer buffer) {
   print(buffer.toString());
+}
+
+Tree fixNames(Tree tree) {
+  return Tree(
+    tree.children.map(_fixNodeNames.apply('')).toList(),
+  );
+}
+
+Node _fixNodeNames(String parentName, Node node) {
+  switch (node.type) {
+    case NodeTypes.subtree:
+      final subTree = node as SubTree;
+      final String name;
+      final String publicName;
+      final String childTreeParentName;
+      final String childLeafParentName;
+      if (subTree.publicName != null) {
+        name = camelCasedName(subTree.publicName!);
+        publicName = firstLetterUpperCased(name) + 'Strings';
+        childTreeParentName = '_' + firstLetterUpperCased(name);
+        childLeafParentName = publicName;
+      } else {
+        name = camelCasedName(subTree.name);
+        publicName = parentName + '_' + firstLetterUpperCased(name);
+        childTreeParentName = publicName;
+        childLeafParentName = publicName;
+      }
+      return SubTree(
+        name: name,
+        children: subTree.children.map((child) {
+          switch (child.type) {
+            case NodeTypes.subtree:
+              return _fixNodeNames(childTreeParentName, child);
+            case NodeTypes.valueLeaf:
+            case NodeTypes.pluralLeaf:
+              return _fixNodeNames(childLeafParentName, child);
+          }
+        }).toList(),
+        publicName: publicName,
+        parentNames: [publicName],
+      );
+    case NodeTypes.valueLeaf:
+      final leaf = node as ValueLeaf;
+      return ValueLeaf(
+        name: camelCasedName(leaf.name),
+        value: leaf.value,
+        arguments: leaf.arguments,
+        parentNames: [parentName],
+      );
+    case NodeTypes.pluralLeaf:
+      final leaf = node as PluralLeaf;
+      return PluralLeaf(
+        name: camelCasedName(leaf.name),
+        other: leaf.other,
+        zero: leaf.zero,
+        one: leaf.one,
+        two: leaf.two,
+        few: leaf.few,
+        many: leaf.many,
+        arguments: leaf.arguments,
+        parentNames: [parentName],
+      );
+  }
 }

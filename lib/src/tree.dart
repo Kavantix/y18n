@@ -16,10 +16,6 @@ abstract class Node {
   final String name;
   final List<String> parentNames;
   NodeTypes get type;
-
-  bool get isRoot =>
-      name == 'Strings' ||
-      parentNames.length == 1 && parentNames.first == 'Strings';
 }
 
 @immutable
@@ -45,9 +41,11 @@ class SubTree extends Node {
     required String name,
     required List<String> parentNames,
     required this.children,
+    required this.publicName,
   }) : super(name: name, parentNames: parentNames);
 
   final List<Node> children;
+  final String? publicName;
 
   @override
   NodeTypes get type => NodeTypes.subtree;
