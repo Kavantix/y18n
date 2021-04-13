@@ -63,7 +63,8 @@ Result<FileContent> retrieveInputFileContent(String path) {
 
 enum NodeTypes {
   subtree,
-  leaf,
+  valueLeaf,
+  pluralLeaf,
 }
 
 @immutable
@@ -78,6 +79,14 @@ abstract class Node {
   NodeTypes get type;
 
   bool get isRoot => name == 'Strings';
+}
+
+@immutable
+abstract class Leaf extends Node {
+  Leaf({
+    required String name,
+    required List<String> parentNames,
+  }) : super(name: name, parentNames: parentNames);
 }
 
 @immutable
@@ -101,8 +110,8 @@ class SubTree extends Node {
 }
 
 @immutable
-class Leaf extends Node {
-  Leaf({
+class ValueLeaf extends Leaf {
+  ValueLeaf({
     required String name,
     required List<String> parentNames,
     required this.arguments,
@@ -113,7 +122,33 @@ class Leaf extends Node {
   final List<String> arguments;
 
   @override
-  NodeTypes get type => NodeTypes.leaf;
+  NodeTypes get type => NodeTypes.valueLeaf;
+}
+
+@immutable
+class PluralLeaf extends Leaf {
+  PluralLeaf({
+    required String name,
+    required List<String> parentNames,
+    required this.arguments,
+    required this.other,
+    required this.zero,
+    required this.one,
+    required this.two,
+    required this.few,
+    required this.many,
+  }) : super(name: name, parentNames: parentNames);
+
+  final String other;
+  final String? zero;
+  final String? one;
+  final String? two;
+  final String? few;
+  final String? many;
+  final List<String> arguments;
+
+  @override
+  NodeTypes get type => NodeTypes.pluralLeaf;
 }
 
 Result<YamlDocument> parseYaml(FileContent fileContent) {
@@ -148,25 +183,38 @@ Tree constructTreeFromYaml(YamlDocument yaml) {
 Tree mergeTrees(Iterable<Tree> trees) =>
     Tree([for (final tree in trees) ...tree.children]);
 
-final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
 Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
-  if (yaml.value is YamlScalar) {
+  final yamlValue = yaml.value;
+  final name = yaml.key;
+  if (yamlValue is YamlScalar) {
     // TODO: handle non string values nicely
-    final value = yaml.value.value as String;
-    final arguments = _argumentRegex
-        .allMatches(value)
-        .map((match) => match.group(1)!)
-        .toList();
-    return Leaf(
-      name: yaml.key,
+    final value = yamlValue.value as String;
+    final arguments = _argumentsFromValue(value);
+    return ValueLeaf(
+      name: name,
       parentNames: parentNames,
       value: value,
       arguments: arguments,
     );
+  } else if (yamlValue is YamlMap &&
+      (yamlValue.keys.first as String).startsWith('\$')) {
+    if (yamlValue.keys.contains('\$plural')) {
+      final other = yamlValue['\$plural'] as String;
+      return PluralLeaf(
+        name: name,
+        parentNames: parentNames,
+        other: other,
+        zero: yamlValue['\$zero'] as String?,
+        one: yamlValue['\$one'] as String?,
+        two: yamlValue['\$two'] as String?,
+        few: yamlValue['\$few'] as String?,
+        many: yamlValue['\$many'] as String?,
+        arguments: _argumentsFromValue(other),
+      );
+    }
   }
   // TODO: handle nicely
   final content = yaml.value as YamlMap;
-  final name = yaml.key;
   final children = content.nodes.entries //
       .map(_entryToYamlEntry)
       .map(nodeFromYaml.apply(parentNames + [name]))
@@ -177,6 +225,10 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
     children: children,
   );
 }
+
+final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
+List<String> _argumentsFromValue(String value) =>
+    _argumentRegex.allMatches(value).map((match) => match.group(1)!).toList();
 
 Tree sortLeafChildrenFirst(Tree tree) {
   return Tree(
@@ -193,14 +245,15 @@ Node _sortLeafChildrenFirst(Node node) {
       final subtree = node as SubTree;
       subtree.children.sort(_compareNodes);
       return subtree;
-    case NodeTypes.leaf:
+    case NodeTypes.valueLeaf:
+    case NodeTypes.pluralLeaf:
       return node;
   }
 }
 
 int _compareNodes(Node lhs, Node rhs) {
   if (lhs.type == rhs.type) return 0;
-  if (lhs.type == NodeTypes.leaf) return -1;
+  if (lhs.type == NodeTypes.valueLeaf) return -1;
   return 1;
 }
 
@@ -234,7 +287,7 @@ void _writeNodeToBuffer(StringBuffer buffer, Node node) {
       subTree.children //
           .where(nodeIsALeaf)
           .map(nodeAsLeaf)
-          .forEach(_writeLeafGetterToBuffer.apply(buffer));
+          .forEach(_writeLeafToBuffer.apply(buffer));
       buffer.writeln();
       subTree.children //
           .where(nodeIsASubtree)
@@ -245,8 +298,25 @@ void _writeNodeToBuffer(StringBuffer buffer, Node node) {
           .where(nodeIsASubtree)
           .forEach(_writeNodeToBuffer.apply(buffer));
       break;
-    case NodeTypes.leaf:
-      _writeLeafGetterToBuffer(buffer, node as Leaf);
+    case NodeTypes.valueLeaf:
+      _writeValueLeafToBuffer(buffer, node as ValueLeaf);
+      break;
+    case NodeTypes.pluralLeaf:
+      _writePluralLeafToBuffer(buffer, node as PluralLeaf);
+      break;
+  }
+}
+
+void _writeLeafToBuffer(StringBuffer buffer, Leaf leaf) {
+  switch (leaf.type) {
+    case NodeTypes.subtree:
+      assert(false, 'Leaf cannot be a subtree');
+      break;
+    case NodeTypes.valueLeaf:
+      _writeValueLeafToBuffer(buffer, leaf as ValueLeaf);
+      break;
+    case NodeTypes.pluralLeaf:
+      _writePluralLeafToBuffer(buffer, leaf as PluralLeaf);
       break;
   }
 }
@@ -263,7 +333,75 @@ final _camelCaseRegex = RegExp(r' (.)');
 String camelCasedName(String name) =>
     name.replaceAllMapped(_camelCaseRegex, (m) => m.group(1)!.toUpperCase());
 
-void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
+void _writePluralLeafToBuffer(StringBuffer buffer, PluralLeaf leaf) {
+  buffer.writeln();
+  buffer.writeln('  /// A translated plural string like:');
+  final lines = leaf.other.split('\n').toList();
+  for (final line in lines) {
+    buffer.writeln('  /// `$line`');
+  }
+  final name = camelCasedName(leaf.name);
+  if (leaf.arguments.isEmpty) {
+    buffer.writeln('  String get $name => Intl.plural(');
+  } else {
+    buffer.writeln('  String $name({');
+    for (final argument in leaf.arguments) {
+      buffer.writeln('    required String $argument,');
+    }
+    buffer.writeln('  }) =>');
+    buffer.writeln('      Intl.plural(');
+    buffer.writeln('        ${leaf.arguments.first},');
+  }
+  final params = {
+    'other': leaf.other,
+    'zero': leaf.zero,
+    'one': leaf.one,
+    'two': leaf.two,
+    'few': leaf.few,
+    'many': leaf.many,
+  };
+  for (final param in params.entries) {
+    if (param.value == null) continue;
+    final lines = param.value!.split('\n').toList();
+    _writeLeafLinesToBufffer(buffer, lines, key: param.key);
+  }
+  final uniqueName = _uniqueTypeNameforNode(leaf);
+  buffer.writeln("        name: '$uniqueName',");
+  if (leaf.arguments.isNotEmpty) {
+    buffer.writeln('        args: [');
+    for (final argument in leaf.arguments) {
+      buffer.writeln('          $argument,');
+    }
+    buffer.writeln('        ],');
+  }
+  buffer.writeln('      );');
+}
+
+void _writeLeafLinesToBufffer(StringBuffer buffer, List<String> lines,
+    {String? key}) {
+  if (lines.length > 1) {
+    if (key != null) {
+      buffer.writeln("        $key: '''");
+    } else {
+      buffer.writeln("        '''");
+    }
+    for (final line in lines.take(lines.length - 1)) {
+      buffer.writeln(line);
+    }
+    buffer.write(lines.last);
+    buffer.writeln("''',");
+  } else {
+    if (key != null) {
+      buffer.write("        $key: '");
+    } else {
+      buffer.write("        '");
+    }
+    buffer.write(lines.first);
+    buffer.writeln("',");
+  }
+}
+
+void _writeValueLeafToBuffer(StringBuffer buffer, ValueLeaf leaf) {
   buffer.writeln();
   buffer.writeln('  /// A translated string like:');
   final lines = leaf.value.split('\n').toList();
@@ -281,18 +419,7 @@ void _writeLeafGetterToBuffer(StringBuffer buffer, Leaf leaf) {
     buffer.writeln('  }) =>');
     buffer.writeln('      Intl.message(');
   }
-  if (lines.length > 1) {
-    buffer.writeln("        '''");
-    for (final line in lines.take(lines.length - 1)) {
-      buffer.writeln(line);
-    }
-    buffer.write(lines.last);
-    buffer.writeln("''',");
-  } else {
-    buffer.write("        '");
-    buffer.write(lines.first);
-    buffer.writeln("',");
-  }
+  _writeLeafLinesToBufffer(buffer, lines);
   final uniqueName = _uniqueTypeNameforNode(leaf);
   buffer.writeln("        name: '$uniqueName',");
   if (leaf.arguments.isNotEmpty) {
@@ -322,7 +449,7 @@ String _uniqueTypeNameforNode(Node node) {
   return buffer.toString();
 }
 
-bool nodeIsALeaf(Node node) => node.type == NodeTypes.leaf;
+bool nodeIsALeaf(Node node) => node is Leaf;
 bool nodeIsASubtree(Node node) => node.type == NodeTypes.subtree;
 SubTree nodeAsSubtree(Node node) => node as SubTree;
 Leaf nodeAsLeaf(Node node) => node as Leaf;
