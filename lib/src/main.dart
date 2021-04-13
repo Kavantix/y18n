@@ -78,7 +78,9 @@ abstract class Node {
   final List<String> parentNames;
   NodeTypes get type;
 
-  bool get isRoot => name == 'Strings';
+  bool get isRoot =>
+      name == 'Strings' ||
+      parentNames.length == 1 && parentNames.first == 'Strings';
 }
 
 @immutable
@@ -86,7 +88,10 @@ abstract class Leaf extends Node {
   Leaf({
     required String name,
     required List<String> parentNames,
+    required this.arguments,
   }) : super(name: name, parentNames: parentNames);
+
+  final List<String> arguments;
 }
 
 @immutable
@@ -114,12 +119,11 @@ class ValueLeaf extends Leaf {
   ValueLeaf({
     required String name,
     required List<String> parentNames,
-    required this.arguments,
+    required List<String> arguments,
     required this.value,
-  }) : super(name: name, parentNames: parentNames);
+  }) : super(name: name, parentNames: parentNames, arguments: arguments);
 
   final String value;
-  final List<String> arguments;
 
   @override
   NodeTypes get type => NodeTypes.valueLeaf;
@@ -130,14 +134,14 @@ class PluralLeaf extends Leaf {
   PluralLeaf({
     required String name,
     required List<String> parentNames,
-    required this.arguments,
+    required List<String> arguments,
     required this.other,
     required this.zero,
     required this.one,
     required this.two,
     required this.few,
     required this.many,
-  }) : super(name: name, parentNames: parentNames);
+  }) : super(name: name, parentNames: parentNames, arguments: arguments);
 
   final String other;
   final String? zero;
@@ -145,7 +149,6 @@ class PluralLeaf extends Leaf {
   final String? two;
   final String? few;
   final String? many;
-  final List<String> arguments;
 
   @override
   NodeTypes get type => NodeTypes.pluralLeaf;
@@ -227,8 +230,11 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
 }
 
 final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
-List<String> _argumentsFromValue(String value) =>
-    _argumentRegex.allMatches(value).map((match) => match.group(1)!).toList();
+List<String> _argumentsFromValue(String value) => _argumentRegex
+    .allMatches(value)
+    .map((match) => match.group(1)!)
+    .toSet()
+    .toList();
 
 Tree sortLeafChildrenFirst(Tree tree) {
   return Tree(
@@ -262,10 +268,50 @@ StringBuffer writeTreeToBuffer(Tree tree) {
   writeImportsToBuffer(buffer);
   tree
       .then(sortLeafChildrenFirst)
-      .then((tree) =>
-          SubTree(name: 'Strings', children: tree.children, parentNames: []))
+      .then((tree) => SubTree(
+            name: 'Strings',
+            children: _childrenWithParentNameForLeafChildren(tree.children,
+                parentName: 'Strings'),
+            parentNames: [],
+          ))
       .then(_writeNodeToBuffer.apply(buffer));
   return buffer;
+}
+
+List<Node> _childrenWithParentNameForLeafChildren(List<Node> children,
+    {required String parentName}) {
+  final newChildren = <Node>[];
+  for (final child in children) {
+    switch (child.type) {
+      case NodeTypes.subtree:
+        newChildren.add(child);
+        break;
+      case NodeTypes.valueLeaf:
+        final leaf = child as ValueLeaf;
+        newChildren.add(ValueLeaf(
+          name: leaf.name,
+          value: leaf.value,
+          parentNames: [parentName],
+          arguments: leaf.arguments,
+        ));
+        break;
+      case NodeTypes.pluralLeaf:
+        final leaf = child as PluralLeaf;
+        newChildren.add(PluralLeaf(
+          name: leaf.name,
+          other: leaf.other,
+          zero: leaf.zero,
+          one: leaf.one,
+          two: leaf.two,
+          few: leaf.few,
+          many: leaf.many,
+          parentNames: [parentName],
+          arguments: leaf.arguments,
+        ));
+        break;
+    }
+  }
+  return newChildren;
 }
 
 void writeImportsToBuffer(StringBuffer buffer) {
@@ -340,18 +386,9 @@ void _writePluralLeafToBuffer(StringBuffer buffer, PluralLeaf leaf) {
   for (final line in lines) {
     buffer.writeln('  /// `$line`');
   }
-  final name = camelCasedName(leaf.name);
-  if (leaf.arguments.isEmpty) {
-    buffer.writeln('  String get $name => Intl.plural(');
-  } else {
-    buffer.writeln('  String $name({');
-    for (final argument in leaf.arguments) {
-      buffer.writeln('    required String $argument,');
-    }
-    buffer.writeln('  }) =>');
-    buffer.writeln('      Intl.plural(');
-    buffer.writeln('        ${leaf.arguments.first},');
-  }
+  _writeArgumentsToBuffer(buffer, leaf, firstArgumentType: 'num');
+  buffer.writeln('      Intl.plural(');
+  buffer.writeln('        ${leaf.arguments.first},');
   final params = {
     'other': leaf.other,
     'zero': leaf.zero,
@@ -363,9 +400,9 @@ void _writePluralLeafToBuffer(StringBuffer buffer, PluralLeaf leaf) {
   for (final param in params.entries) {
     if (param.value == null) continue;
     final lines = param.value!.split('\n').toList();
-    _writeLeafLinesToBufffer(buffer, lines, key: param.key);
+    _writeLeafLinesToBuffer(buffer, lines, key: param.key);
   }
-  final uniqueName = _uniqueTypeNameforNode(leaf);
+  final uniqueName = _uniqueLeafNameforNode(leaf, isPrivate: true);
   buffer.writeln("        name: '$uniqueName',");
   if (leaf.arguments.isNotEmpty) {
     buffer.writeln('        args: [');
@@ -377,7 +414,33 @@ void _writePluralLeafToBuffer(StringBuffer buffer, PluralLeaf leaf) {
   buffer.writeln('      );');
 }
 
-void _writeLeafLinesToBufffer(StringBuffer buffer, List<String> lines,
+void _writeArgumentsToBuffer(
+  StringBuffer buffer,
+  Leaf leaf, {
+  String firstArgumentType = 'String',
+}) {
+  final name = camelCasedName(leaf.name);
+  buffer.writeln('  String $name({');
+  buffer.writeln('    required $firstArgumentType ${leaf.arguments.first},');
+  for (final argument in leaf.arguments.skip(1)) {
+    buffer.writeln('    required String $argument,');
+  }
+  buffer.writeln('  }) =>');
+  buffer.writeln('      _$name(');
+  for (final argument in leaf.arguments) {
+    buffer.writeln('        $argument,');
+  }
+  buffer.writeln('      );');
+  buffer.writeln();
+  buffer.writeln('  String _$name(');
+  buffer.writeln('    $firstArgumentType ${leaf.arguments.first},');
+  for (final argument in leaf.arguments.skip(1)) {
+    buffer.writeln('    String $argument,');
+  }
+  buffer.writeln('  ) =>');
+}
+
+void _writeLeafLinesToBuffer(StringBuffer buffer, List<String> lines,
     {String? key}) {
   if (lines.length > 1) {
     if (key != null) {
@@ -412,15 +475,12 @@ void _writeValueLeafToBuffer(StringBuffer buffer, ValueLeaf leaf) {
   if (leaf.arguments.isEmpty) {
     buffer.writeln('  String get $name => Intl.message(');
   } else {
-    buffer.writeln('  String $name({');
-    for (final argument in leaf.arguments) {
-      buffer.writeln('    required String $argument,');
-    }
-    buffer.writeln('  }) =>');
+    _writeArgumentsToBuffer(buffer, leaf);
     buffer.writeln('      Intl.message(');
   }
-  _writeLeafLinesToBufffer(buffer, lines);
-  final uniqueName = _uniqueTypeNameforNode(leaf);
+  _writeLeafLinesToBuffer(buffer, lines);
+  final uniqueName =
+      _uniqueLeafNameforNode(leaf, isPrivate: leaf.arguments.isNotEmpty);
   buffer.writeln("        name: '$uniqueName',");
   if (leaf.arguments.isNotEmpty) {
     buffer.writeln('        args: [');
@@ -436,6 +496,19 @@ void _writeSubtreeGetterToBuffer(StringBuffer buffer, SubTree subTree) {
   final type = _uniqueTypeNameforNode(subTree);
   buffer
       .writeln('  $type get ${camelCasedName(subTree.name)} => const $type();');
+}
+
+String _uniqueLeafNameforNode(Node node, {required bool isPrivate}) {
+  final buffer = StringBuffer(node.isRoot ? '' : '_');
+  for (final name in node.parentNames) {
+    name //
+        .then(camelCasedName)
+        .then(firstLetterUpperCased)
+        .then(buffer.write);
+  }
+  if (isPrivate) buffer.write('_');
+  buffer.write('_${camelCasedName(node.name)}');
+  return buffer.toString();
 }
 
 String _uniqueTypeNameforNode(Node node) {
