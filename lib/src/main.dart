@@ -204,7 +204,8 @@ int _compareNodes(Node lhs, Node rhs) {
   return 1;
 }
 
-StringBuffer writeYamlFileToBuffer(StringBuffer buffer, Tree tree) {
+StringBuffer writeTreeToBuffer(Tree tree) {
+  final buffer = StringBuffer();
   writeImportsToBuffer(buffer);
   tree
       .then(sortLeafChildrenFirst)

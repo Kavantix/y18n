@@ -29,11 +29,11 @@ class GenerateCommand extends Command {
     }
     final result = paths //
         .map(retrieveInputFileContent)
-        .then(parseYaml)
+        .bindAll(parseYaml)
         .mapAll(constructTreeFromYaml)
         .mapAll(sortLeafChildrenFirst)
-        .fold(mergeTrees)
-        .map(writeYamlFileToBuffer.apply(StringBuffer()));
+        .map(mergeTrees)
+        .map(writeTreeToBuffer);
     if (result.hasError) {
       switch (result.error!) {
         case Errors.fileNotFound:

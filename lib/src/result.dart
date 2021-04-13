@@ -60,7 +60,8 @@ extension ObjectAsResultExtension<T extends Object> on T {
 }
 
 extension ResultListExtension<V extends Object> on Iterable<Result<V>> {
-  Result<List<R>> then<R extends Object>(ResultContinuation<R, V> converter) {
+  Result<List<R>> bindAll<R extends Object>(
+      ResultContinuation<R, V> converter) {
     final results = <R>[];
     for (final result in this) {
       if (result.hasError) return result._cast<List<R>>();
@@ -88,11 +89,6 @@ extension ListResultExtension<V extends Object> on Result<Iterable<V>> {
   Result<Iterable<R>> mapAll<R extends Object>(R Function(V value) mapper) {
     if (hasError) return _cast<List<R>>();
     return value!.map(mapper).asResult();
-  }
-
-  Result<R> fold<R extends Object>(R Function(Iterable<V> values) folder) {
-    if (hasError) return _cast<R>();
-    return folder(value!).asResult();
   }
 
   Result<R> reduce<R extends Object>(
