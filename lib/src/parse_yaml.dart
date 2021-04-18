@@ -1,31 +1,8 @@
-import 'dart:io';
-
-import 'package:meta/meta.dart';
 import 'package:yaml/yaml.dart';
 
 import 'common.dart';
 import 'result.dart';
 import 'tree.dart';
-
-@immutable
-class FileContent {
-  FileContent({
-    required this.path,
-    required this.content,
-  });
-  final String path;
-  final String content;
-}
-
-Result<FileContent> retrieveInputFileContent(String path) {
-  final file = File(path);
-  if (!file.existsSync()) {
-    return Result.fileNotFound(path);
-  } else {
-    final content = file.readAsStringSync();
-    return FileContent(path: path, content: content).asResult();
-  }
-}
 
 Result<YamlDocument> parseYaml(FileContent fileContent) {
   final YamlDocument yaml;

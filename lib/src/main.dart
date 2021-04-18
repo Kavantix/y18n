@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'common.dart';
@@ -88,4 +89,22 @@ Node _fixNodeNames(String parentName, Node node) {
         parentNames: [parentName],
       );
   }
+}
+
+Stream<List<String>> watchPaths(List<String> paths) async* {
+  final controller = StreamController<List<String>>();
+  final files = paths.map((p) => File(p));
+  void onUpdate(File file, FileSystemEvent event) {
+    if (event.type == FileSystemEvent.delete) {
+      file.watch().listen((event) => onUpdate(file, event));
+    } else if (event.type == FileSystemEvent.modify) {
+      controller.add(paths);
+    }
+  }
+
+  for (final file in files) {
+    file.watch().listen((event) => onUpdate(file, event));
+  }
+  yield paths;
+  yield* controller.stream.debounced(const Duration(milliseconds: 10));
 }

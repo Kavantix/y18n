@@ -1,5 +1,6 @@
 import 'package:args/command_runner.dart';
 
+import '../src/common.dart';
 import '../src/main.dart';
 import '../src/parse_yaml.dart';
 import '../src/result.dart';
