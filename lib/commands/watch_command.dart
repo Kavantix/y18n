@@ -35,10 +35,14 @@ class WatchCommand extends Command {
       usageException('No input files provided');
     }
     final completer = Completer<void>();
+    final sw = Stopwatch();
     watchPaths(paths).listen(
       (paths) {
         try {
           print('Generating for files: $paths');
+          sw
+            ..reset()
+            ..start();
           final result = paths //
               .map(retrieveInputFileContent)
               .bindAll(parseYaml)
@@ -63,7 +67,10 @@ class WatchCommand extends Command {
             }
           }
           outputBuffer(args['output'], result.value!);
-          print('Generated ${args['output']}');
+          sw.stop();
+          print(
+            'Generated ${args['output']} in ${sw.elapsed.inMicroseconds / 1000} ms',
+          );
         } catch (error) {
           completer.completeError(error);
         }
