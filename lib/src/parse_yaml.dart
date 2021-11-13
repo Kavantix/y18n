@@ -27,7 +27,9 @@ class _YamlStructureInvalid implements Exception {
 Result<Tree> constructTreeFromYaml(YamlDocument yaml) {
   final content = yaml.contents;
   if (content is! YamlMap) {
-    return Result.yamlStructureInvalid('Invalid yaml file');
+    return Result.yamlStructureInvalid(
+      YamlInvalidExplanation('Invalid yaml file'),
+    );
   }
   try {
     final children = content.nodes.entries //
@@ -36,12 +38,12 @@ Result<Tree> constructTreeFromYaml(YamlDocument yaml) {
         .toList();
     return Tree(children).asResult();
   } on _YamlStructureInvalid catch (error) {
-    return Result.yamlStructureInvalid(
+    return Result.yamlStructureInvalid(YamlInvalidExplanation(
       '''
 Yaml structure invalid!
 > Error at: ${error.parentNames.join(" -> ")}
 > ** ${error.message} **''',
-    );
+    ));
   }
 }
 

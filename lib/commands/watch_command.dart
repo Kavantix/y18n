@@ -43,34 +43,36 @@ class WatchCommand extends Command {
           sw
             ..reset()
             ..start();
-          final result = paths //
+          paths //
               .map(retrieveInputFileContent)
               .bindAll(parseYaml)
               .bindAll(constructTreeFromYaml)
               .map(mergeTrees)
               .map(fixNames)
-              .map(writeTreeToBuffer);
-          if (result.hasError) {
-            switch (result.error!) {
-              case Errors.fileNotFound:
-                usageException(
-                    'File not found at path: ${result.fileNotFoundPath}');
-              case Errors.yamlParsingFailed:
-                final fileError = result.yamlParsingFailedError;
-                print('${fileError.path} contains invalid yaml:');
-                print(fileError.error);
-                return;
-              case Errors.yamlStructureInvalid:
-                final message = result.yamlStructureInvalidMessage;
-                print(message);
-                return;
-            }
-          }
-          outputBuffer(args['output'], result.value!);
-          sw.stop();
-          print(
-            'Generated ${args['output']} in ${sw.elapsed.inMicroseconds / 1000} ms',
-          );
+              .map(writeTreeToBuffer)
+              .match(
+                value: (value) {
+                  outputBuffer(args['output'], value);
+                  sw.stop();
+                  print(
+                    'Generated ${args['output']} in ${sw.elapsed.inMicroseconds / 1000} ms',
+                  );
+                },
+                failure: (failure) => () {
+                  failure.match(
+                    fileNotFound: (filePath) => usageException(
+                        'File not found at path: ${filePath.value}'),
+                    yamlParsingFailed: (fileError) {
+                      print('${fileError.path} contains invalid yaml:');
+                      print(fileError.error);
+                    },
+                    yamlStructureInvalid: (explanation) =>
+                        print(explanation.value),
+                  );
+                  sw.stop();
+                  print('Failed after ${sw.elapsed.inMicroseconds / 1000} ms');
+                }(),
+              );
         } catch (error) {
           completer.completeError(error);
         }

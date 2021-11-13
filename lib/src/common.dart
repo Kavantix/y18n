@@ -33,7 +33,7 @@ class FileContent {
 Result<FileContent> retrieveInputFileContent(String path) {
   final file = File(path);
   if (!file.existsSync()) {
-    return Result.fileNotFound(path);
+    return Result.failure(Failure.fileNotFound(FilePath(path)));
   } else {
     final content = file.readAsStringSync();
     return FileContent(path: path, content: content).asResult();
