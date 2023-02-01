@@ -31,31 +31,29 @@ class GenerateCommand extends Command {
     if (paths.isEmpty) {
       usageException('No input files provided');
     }
-    return paths //
+    final result = paths //
         .map(retrieveInputFileContent)
         .bindAll(parseYaml)
         .bindAll(constructTreeFromYaml)
         .map(mergeTrees)
         .map(fixNames)
-        .map(writeTreeToBuffer)
-        .match(
-          value: (value) {
-            outputBuffer(args['output'], value);
-            return 0;
-          },
-          failure: (failure) => failure.match(
-            fileNotFound: (filePath) =>
-                usageException('File not found at path: ${filePath.value}'),
-            yamlParsingFailed: (fileError) {
-              print('${fileError.path} contains invalid yaml:');
-              print(fileError.error);
-              return 1;
-            },
-            yamlStructureInvalid: (explanation) {
-              print(explanation.value);
-              return 1;
-            },
-          ),
-        );
+        .map(writeTreeToBuffer);
+    if (result.hasError) {
+      switch (result.error!) {
+        case Errors.fileNotFound:
+          usageException('File not found at path: ${result.fileNotFoundPath}');
+        case Errors.yamlParsingFailed:
+          final fileError = result.yamlParsingFailedError;
+          print('${fileError.path} contains invalid yaml:');
+          print(fileError.error);
+          return 1;
+        case Errors.yamlStructureInvalid:
+          final message = result.yamlStructureInvalidMessage;
+          print(message);
+          return 1;
+      }
+    }
+    outputBuffer(args['output'], result.value!);
+    return 0;
   }
 }
