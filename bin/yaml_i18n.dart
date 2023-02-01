@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:logging/logging.dart';
-import 'package:yaml_i18n/commands/generate_command.dart';
-import 'package:yaml_i18n/commands/watch_command.dart';
+import 'src/commands/generate_command.dart';
+import 'src/commands/watch_command.dart';
 
 void main(List<String> arguments) async {
   Object? returnCode;

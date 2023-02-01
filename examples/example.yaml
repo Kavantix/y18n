@@ -1,0 +1,11 @@
+pages:
+  dashboard:
+    title: ola world
+  # bla is used in the bla page
+  bla: test
+  loginPage:
+    $name: loginPage
+    title: ola $name, $email you are welcome $name, $email
+  count:
+    $plural: $count items
+    $one: one item

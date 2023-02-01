@@ -1,11 +1,11 @@
 import 'package:args/command_runner.dart';
 
-import '../src/common.dart';
-import '../src/main.dart';
-import '../src/parse_yaml.dart';
-import '../src/result.dart';
-import '../src/tree.dart';
-import '../src/write_tree.dart';
+import 'package:yaml_i18n/src/common.dart';
+import 'package:yaml_i18n/src/main.dart';
+import 'package:yaml_i18n/src/parse_yaml.dart';
+import 'package:yaml_i18n/src/result.dart';
+import 'package:yaml_i18n/src/tree.dart';
+import 'package:yaml_i18n/src/write_tree.dart';
 
 class GenerateCommand extends Command {
   @override

@@ -69,7 +69,7 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
           : 'Only scalars and maps are allowed',
     );
   }
-  if (yamlValue is YamlMap && yamlValue.keys.contains('\$plural')) {
+  if (yamlValue.keys.contains('\$plural')) {
     final other = yamlValue['\$plural'].toString();
     return PluralLeaf(
       name: name,
