@@ -50,6 +50,9 @@ List<Node> _childrenWithParentNameForLeafChildren(List<Node> children,
 }
 
 void writeImportsToBuffer(StringBuffer buffer) {
+  buffer.writeln(
+      '// ignore_for_file: library_private_types_in_public_api, camel_case_types');
+  buffer.writeln();
   buffer.writeln("import 'package:flutter/widgets.dart';");
   buffer.writeln("import 'package:intl/intl.dart';");
 }
