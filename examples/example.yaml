@@ -5,7 +5,7 @@ pages:
   bla: test
   loginPage:
     $name: loginPage
-    title: ola $name, $email you are welcome $name, $email
+    title: ola $name, $email you are welcome $name, ${email}
   count:
-    $plural: $count items
+    $plural: ${count} items
     $one: one item

@@ -100,9 +100,9 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
   );
 }
 
-final _argumentRegex = RegExp(r'\$(\w[a-zA-Z0-9]+)');
+final _argumentRegex = RegExp(r'\${([a-zA-Z0-9]+)}|\$(?!{)([a-zA-Z0-9]+)');
 Set<String> _argumentsFromValue(String value) => //
     _argumentRegex //
         .allMatches(value)
-        .map((match) => match.group(1)!)
+        .map((match) => (match.group(1) ?? match.group(2))!)
         .toSet();
