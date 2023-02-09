@@ -71,6 +71,13 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
   }
   if (yamlValue.keys.contains('\$plural')) {
     final other = yamlValue['\$plural'].toString();
+    final arguments = _argumentsFromValue(other);
+    if (arguments.isEmpty) {
+      throw _YamlStructureInvalid(
+        parentNames + [name],
+        'Plural strings need at least a single argument representing how many elements it contains',
+      );
+    }
     return PluralLeaf(
       name: name,
       parentNames: parentNames,
@@ -80,7 +87,7 @@ Node nodeFromYaml(List<String> parentNames, MapEntry<String, YamlNode> yaml) {
       two: yamlValue['\$two']?.toString(),
       few: yamlValue['\$few']?.toString(),
       many: yamlValue['\$many']?.toString(),
-      arguments: _argumentsFromValue(other),
+      arguments: arguments,
     );
   }
   final content = yaml.value as YamlMap;
