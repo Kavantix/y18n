@@ -95,15 +95,39 @@ Stream<List<String>> watchPaths(List<String> paths) async* {
   final controller = StreamController<List<String>>();
   final files = paths.map((p) => File(p));
   void onUpdate(File file, FileSystemEvent event) {
-    if (event.type == FileSystemEvent.delete) {
+    if (event.type == FileSystemEvent.delete && !Platform.isWindows) {
       file.watch().listen((event) => onUpdate(file, event));
     } else if (event.type == FileSystemEvent.modify) {
       controller.add(paths);
     }
   }
 
-  for (final file in files) {
-    file.watch().listen((event) => onUpdate(file, event));
+  if (Platform.isWindows) {
+    final directories = files
+        .map((f) => f.absolute.parent)
+        .fold<List<Directory>>([], (dirs, nextDir) {
+      if (!dirs.any((d) => d.path == nextDir.path)) {
+        dirs.add(nextDir);
+      }
+      return dirs;
+    });
+    final filePaths = files.map((f) => f.absolute.path);
+    for (final dir in directories) {
+      dir.watch().listen((event) {
+        if (event.isDirectory) {
+          return;
+        }
+        final changedFile = File(event.path).absolute;
+        if (!filePaths.contains(changedFile.path)) {
+          return;
+        }
+        onUpdate(changedFile, event);
+      });
+    }
+  } else {
+    for (final file in files) {
+      file.watch().listen((event) => onUpdate(file, event));
+    }
   }
   yield paths;
   yield* controller.stream.debounced(const Duration(milliseconds: 10));
