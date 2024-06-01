@@ -1,11 +1,12 @@
+# test
 pages:
   dashboard:
     title: ola world
   # bla is used in the bla page
-  bla: test
+  bla: test # line comm
   loginPage:
-    $name: loginPage
+    $name: LoginPage
     title: ola $name, $email you are welcome $name, ${email}
   count:
-    $plural: ${count} items
+    $plural: $count items
     $one: one item
