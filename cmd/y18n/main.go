@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Kavantix/y18n/internal/tree"
+	"github.com/Kavantix/y18n/internal/typescript"
 	"github.com/rsc/getopt"
 )
 
@@ -56,5 +57,7 @@ func main() {
 		eprintf("ERROR: failed to parse file '%s': %s", *path, err)
 		os.Exit(1)
 	}
-	fmt.Printf("%+v", tree)
+
+	encoder := typescript.NewEncoder(os.Stdout)
+	encoder.Encode(tree)
 }

@@ -2,11 +2,11 @@ package tree
 
 import "strings"
 
-type nodeChild interface {
+type NodeChild interface {
 	nodeChild()
 	appendStringAtDepth(builder *strings.Builder, depth int)
 }
 
-var _ nodeChild = &Node{}
-var _ nodeChild = Leaf{}
-var _ nodeChild = PluralLeaf{}
+var _ NodeChild = &Node{}
+var _ NodeChild = Leaf{}
+var _ NodeChild = PluralLeaf{}

@@ -7,7 +7,7 @@ type Node struct {
 	ParentNames []string
 	Name        string
 	Description string
-	Children    []nodeChild
+	Children    []NodeChild
 }
 
 func (*Node) nodeChild() {}

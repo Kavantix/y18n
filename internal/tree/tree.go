@@ -7,9 +7,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Tree = *Node
+type RootNode = *Node
 
-func ParseYaml(reader io.Reader) (Tree, error) {
+func ParseYaml(reader io.Reader) (RootNode, error) {
 	yamlNode := &yaml.Node{}
 	decoder := yaml.NewDecoder(reader)
 	err := decoder.Decode(yamlNode)
@@ -49,7 +49,7 @@ func parseYamlNode(yamlNode *yaml.Node, node *Node, depth int) {
 					ParentNames: parentNames,
 				}
 				parseYamlNode(value, &childNode, depth+1)
-				if slices.ContainsFunc(childNode.Children, func(child nodeChild) bool {
+				if slices.ContainsFunc(childNode.Children, func(child NodeChild) bool {
 					leaf, isLeaf := child.(Leaf)
 					return isLeaf && leaf.Name == "$plural"
 				}) {
